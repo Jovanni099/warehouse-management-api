@@ -63,5 +63,53 @@ productsRouter.post("/", async (req: Request, res: Response) => {
   return res.status(201).json(product);
 });
 
+productsRouter.put("/:id", async (req: Request<{id:string}>, res: Response) => {
+  const { id } = req.params;
+  const { name, sku, description } = req.body;
+
+  const existingProduct = await prisma.product.findUnique({
+    where: {
+      id,
+    },
+  });
+
+  if (!existingProduct) {
+    return res.status(404).json({
+      message: "product not found",
+    });
+  }
+
+  if (!name || !sku) {
+    return res.status(400).json({
+      message: "name and sku are required",
+    });
+  }
+
+  const productWithSameSku = await prisma.product.findUnique({
+    where: {
+      sku,
+    },
+  });
+
+  if (productWithSameSku && productWithSameSku.id !== id) {
+    return res.status(409).json({
+      message: "product with this sku already exists",
+    });
+  }
+
+  const updatedProduct = await prisma.product.update({
+    where: {
+      id,
+    },
+    data: {
+      name,
+      sku,
+      description,
+    },
+  });
+
+  return res.status(200).json(updatedProduct);
+});
+
 
 export default productsRouter;
