@@ -13,7 +13,7 @@ productsRouter.get("/", async (_req: Request, res: Response) => {
   res.status(200).json(products);
 });
 
-productsRouter.get("/:id", async (req: Request, res: Response) => {
+productsRouter.get("/:id", async (req: Request<{ id: string }>, res: Response) => {
   const { id } = req.params;
 
   const product = await prisma.product.findUnique({
