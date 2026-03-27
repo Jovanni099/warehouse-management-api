@@ -64,4 +64,6 @@ warehousesRouter.get("/:id", async (req: Request<{ id: string }>, res: Response)
 });
 
 
+
+
 export default warehousesRouter;
