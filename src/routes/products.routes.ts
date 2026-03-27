@@ -13,4 +13,37 @@ productsRouter.get("/", async (_req: Request, res: Response) => {
   res.status(200).json(products);
 });
 
+productsRouter.post("/", async (req: Request, res: Response) => {
+  const { name, sku, description } = req.body;
+
+  if (!name || !sku) {
+    return res.status(400).json({
+      message: "name and sku are required",
+    });
+  }
+
+  const existingProduct = await prisma.product.findUnique({
+    where: {
+      sku,
+    },
+  });
+
+  if (existingProduct) {
+    return res.status(409).json({
+      message: "product with this sku already exists",
+    });
+  }
+
+  const product = await prisma.product.create({
+    data: {
+      name,
+      sku,
+      description,
+    },
+  });
+
+  return res.status(201).json(product);
+});
+
+
 export default productsRouter;
