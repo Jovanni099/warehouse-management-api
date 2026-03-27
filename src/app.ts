@@ -11,7 +11,6 @@ app.use(express.json());
 app.use(healthRouter);
 app.use("/products", productsRouter);
 app.use("/warehouses", warehousesRouter);
-app.use("/stock-movements", stockMovementsRouter);
-
+app.use("/stock-movements", stockMovementsRouter)
 
 export default app;
