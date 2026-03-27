@@ -45,5 +45,23 @@ warehousesRouter.post("/", async (req: Request, res: Response) => {
   return res.status(201).json(warehouse);
 });
 
+warehousesRouter.get("/:id", async (req: Request<{ id: string }>, res: Response) => {
+  const { id } = req.params;
+
+  const warehouse = await prisma.warehouse.findUnique({
+    where: {
+      id,
+    },
+  });
+
+  if (!warehouse) {
+    return res.status(404).json({
+      message: "warehouse not found",
+    });
+  }
+
+  return res.status(200).json(warehouse);
+});
+
 
 export default warehousesRouter;
