@@ -111,5 +111,42 @@ productsRouter.put("/:id", async (req: Request<{id:string}>, res: Response) => {
   return res.status(200).json(updatedProduct);
 });
 
+productsRouter.delete("/:id", async (req: Request<{id: string}>, res: Response) => {
+  const { id } = req.params;
+
+  const existingProduct = await prisma.product.findUnique({
+    where: {
+      id,
+    },
+  });
+
+  if (!existingProduct) {
+    return res.status(404).json({
+      message: "product not found",
+    });
+  }
+
+  const stockMovementsCount = await prisma.stockMovement.count({
+    where: {
+      productId: id,
+    },
+  });
+
+  if (stockMovementsCount > 0) {
+    return res.status(409).json({
+      message: "cannot delete product with stock movements",
+    });
+  }
+
+  await prisma.product.delete({
+    where: {
+      id,
+    },
+  });
+
+  return res.status(200).json({
+    message: "product deleted successfully",
+  });
+});
 
 export default productsRouter;
