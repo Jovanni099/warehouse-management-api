@@ -63,7 +63,7 @@ warehousesRouter.get("/:id", async (req: Request<{ id: string }>, res: Response)
   return res.status(200).json(warehouse);
 });
 
-warehousesRouter.put("/:id", async (req: Request, res: Response) => {
+warehousesRouter.put("/:id", async (req: Request<{id: string}>, res: Response) => {
   const { id } = req.params;
   const { name, code, location } = req.body;
 
@@ -109,6 +109,44 @@ warehousesRouter.put("/:id", async (req: Request, res: Response) => {
   });
 
   return res.status(200).json(updatedWarehouse);
+});
+
+warehousesRouter.delete("/:id", async (req: Request<{id: string}>, res: Response) => {
+  const { id } = req.params;
+
+  const existingWarehouse = await prisma.warehouse.findUnique({
+    where: {
+      id,
+    },
+  });
+
+  if (!existingWarehouse) {
+    return res.status(404).json({
+      message: "warehouse not found",
+    });
+  }
+
+  const stockMovementsCount = await prisma.stockMovement.count({
+    where: {
+      warehouseId: id,
+    },
+  });
+
+  if (stockMovementsCount > 0) {
+    return res.status(409).json({
+      message: "cannot delete warehouse with stock movements",
+    });
+  }
+
+  await prisma.warehouse.delete({
+    where: {
+      id,
+    },
+  });
+
+  return res.status(200).json({
+    message: "warehouse deleted successfully",
+  });
 });
 
 
