@@ -13,6 +13,24 @@ productsRouter.get("/", async (_req: Request, res: Response) => {
   res.status(200).json(products);
 });
 
+productsRouter.get("/:id", async (req: Request, res: Response) => {
+  const { id } = req.params;
+
+  const product = await prisma.product.findUnique({
+    where: {
+      id,
+    },
+  });
+
+  if (!product) {
+    return res.status(404).json({
+      message: "product not found",
+    });
+  }
+
+  return res.status(200).json(product);
+});
+
 productsRouter.post("/", async (req: Request, res: Response) => {
   const { name, sku, description } = req.body;
 
