@@ -64,4 +64,75 @@ stockBalanceRouter.get(
   }
 );
 
+// balances of all products in one warehouse
+stockBalanceRouter.get(
+  "/warehouse/:warehouseId",
+  async (req: Request<{warehouseId: string}>, res: Response) => {
+    const { warehouseId } = req.params;
+
+    const warehouse = await prisma.warehouse.findUnique({
+      where: { id: warehouseId },
+    });
+
+    if (!warehouse) {
+      return res.status(404).json({
+        message: "warehouse not found",
+      });
+    }
+
+    const movements = await prisma.stockMovement.findMany({
+      where: {
+        warehouseId,
+      },
+      include: {
+        product: true,
+      },
+      orderBy: {
+        createdAt: "asc",
+      },
+    });
+
+    const balanceMap = new Map<
+      string,
+      {
+        productId: string;
+        productName: string;
+        sku: string;
+        totalIn: number;
+        totalOut: number;
+        currentStock: number;
+      }
+    >();
+
+    for (const movement of movements) {
+      const existing = balanceMap.get(movement.productId);
+
+      if (!existing) {
+        balanceMap.set(movement.productId, {
+          productId: movement.productId,
+          productName: movement.product.name,
+          sku: movement.product.sku,
+          totalIn: movement.type === "IN" ? movement.quantity : 0,
+          totalOut: movement.type === "OUT" ? movement.quantity : 0,
+          currentStock: movement.type === "IN" ? movement.quantity : -movement.quantity,
+        });
+      } else {
+        if (movement.type === "IN") {
+          existing.totalIn += movement.quantity;
+          existing.currentStock += movement.quantity;
+        } else {
+          existing.totalOut += movement.quantity;
+          existing.currentStock -= movement.quantity;
+        }
+      }
+    }
+
+    return res.status(200).json({
+      warehouseId,
+      warehouseName: warehouse.name,
+      items: Array.from(balanceMap.values()),
+    });
+  }
+);
+
 export default stockBalanceRouter;
