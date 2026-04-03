@@ -1,5 +1,7 @@
 import { Router, Request, Response } from "express";
+import {z} from "zod"
 import { prisma } from "../prisma.js";
+import { error } from "node:console";
 
 const warehousesRouter = Router();
 
@@ -8,6 +10,12 @@ type UpdateWarehouseBody = {
     code: string;
     location?: string;
 }
+
+const updateWarehouseSchema = z.object({
+    name: z.string().trim().min(1, "name is required"),
+    code: z.string().trim().min(1, "code is required"),
+    location: z.string().trim().optional()
+})
 
 warehousesRouter.get("/", async (_req: Request, res: Response) => {
   const warehouses = await prisma.warehouse.findMany({
@@ -51,7 +59,7 @@ warehousesRouter.post("/", async (req: Request, res: Response) => {
   return res.status(201).json(warehouse);
 });
 
-warehousesRouter.get("/:id", async (req: Request<{ id: string }, {}, UpdateWarehouseBody>, res: Response) => {
+warehousesRouter.get("/:id", async (req: Request<{ id: string }>, res: Response) => {
   const { id } = req.params;
 
   const warehouse = await prisma.warehouse.findUnique({
@@ -69,53 +77,66 @@ warehousesRouter.get("/:id", async (req: Request<{ id: string }, {}, UpdateWareh
   return res.status(200).json(warehouse);
 });
 
-warehousesRouter.put("/:id", async (req: Request<{id: string}>, res: Response) => {
-  const { id } = req.params;
-  const { name, code, location } = req.body;
+warehousesRouter.put(
+  "/:id",
+  async (req: Request<{ id: string }, {}, UpdateWarehouseBody>, res: Response) => {
+    try {
+      const { id } = req.params;
+      
+      const parsed = updateWarehouseSchema.safeParse(req.body)
 
-  const existingWarehouse = await prisma.warehouse.findUnique({
-    where: {
-      id,
-    },
-  });
+      if(!parsed.success){
+        return res.status(400).json({
+            message: "validation error",
+            errors: parsed.error.issues,
+        })
+      }
 
-  if (!existingWarehouse) {
-    return res.status(404).json({
-      message: "warehouse not found",
-    });
+      const {name, code, location} = parsed.data
+
+      const existingWarehouse = await prisma.warehouse.findUnique({
+        where: {
+          id,
+        },
+      });
+
+      if (!existingWarehouse) {
+        return res.status(404).json({
+          message: "warehouse not found",
+        });
+      }
+
+      const warehouseWithSameCode = await prisma.warehouse.findUnique({
+        where: {
+          code,
+        },
+      });
+
+      if (warehouseWithSameCode && warehouseWithSameCode.id !== id) {
+        return res.status(409).json({
+          message: "warehouse with this code already exists",
+        });
+      }
+
+      const updatedWarehouse = await prisma.warehouse.update({
+        where: {
+          id,
+        },
+        data: {
+          name,
+          code,
+          location,
+        },
+      });
+
+      return res.status(200).json(updatedWarehouse);
+    } catch (error) {
+      return res.status(500).json({
+        message: "internal server error",
+      });
+    }
   }
-
-  if (!name || !code) {
-    return res.status(400).json({
-      message: "name and code are required",
-    });
-  }
-
-  const warehouseWithSameCode = await prisma.warehouse.findUnique({
-    where: {
-      code,
-    },
-  });
-
-  if (warehouseWithSameCode && warehouseWithSameCode.id !== id) {
-    return res.status(409).json({
-      message: "warehouse with this code already exists",
-    });
-  }
-
-  const updatedWarehouse = await prisma.warehouse.update({
-    where: {
-      id,
-    },
-    data: {
-      name,
-      code,
-      location,
-    },
-  });
-
-  return res.status(200).json(updatedWarehouse);
-});
+);
 
 warehousesRouter.delete("/:id", async (req: Request<{id: string}>, res: Response) => {
   const { id } = req.params;
