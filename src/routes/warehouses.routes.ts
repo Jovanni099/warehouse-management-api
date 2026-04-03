@@ -3,6 +3,12 @@ import { prisma } from "../prisma.js";
 
 const warehousesRouter = Router();
 
+type UpdateWarehouseBody = {
+    name: string;
+    code: string;
+    location?: string;
+}
+
 warehousesRouter.get("/", async (_req: Request, res: Response) => {
   const warehouses = await prisma.warehouse.findMany({
     orderBy: {
@@ -45,7 +51,7 @@ warehousesRouter.post("/", async (req: Request, res: Response) => {
   return res.status(201).json(warehouse);
 });
 
-warehousesRouter.get("/:id", async (req: Request<{ id: string }>, res: Response) => {
+warehousesRouter.get("/:id", async (req: Request<{ id: string }, {}, UpdateWarehouseBody>, res: Response) => {
   const { id } = req.params;
 
   const warehouse = await prisma.warehouse.findUnique({
