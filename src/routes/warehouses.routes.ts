@@ -5,17 +5,13 @@ import { error } from "node:console";
 
 const warehousesRouter = Router();
 
-type UpdateWarehouseBody = {
-    name: string;
-    code: string;
-    location?: string;
-}
-
 const updateWarehouseSchema = z.object({
     name: z.string().trim().min(1, "name is required"),
     code: z.string().trim().min(1, "code is required"),
     location: z.string().trim().optional()
 })
+
+type UpdateWarehouseBody = z.infer<typeof updateWarehouseSchema>;
 
 warehousesRouter.get("/", async (_req: Request, res: Response) => {
   const warehouses = await prisma.warehouse.findMany({
