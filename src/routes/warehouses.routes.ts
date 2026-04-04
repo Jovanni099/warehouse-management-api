@@ -1,4 +1,4 @@
-import { Router, Request, Response } from "express";
+import e, { Router, Request, Response, NextFunction } from "express";
 import {z} from "zod"
 import { prisma } from "../prisma.js";
 
@@ -16,7 +16,7 @@ const warehouseBodySchema = z.object({
 
 type WarehouseBody = z.infer<typeof warehouseBodySchema>;
 
-warehousesRouter.get("/", async (_req: Request, res: Response) => {
+warehousesRouter.get("/", async (_req: Request, res: Response, next: NextFunction) => {
   try {
     const warehouses = await prisma.warehouse.findMany({
       orderBy: {
@@ -26,13 +26,11 @@ warehousesRouter.get("/", async (_req: Request, res: Response) => {
 
     return res.status(200).json(warehouses);
   } catch (error) {
-      return res.status(500).json({
-      message: "internal server error",
-    });
+      next(error)
   }
 });
 
-warehousesRouter.post("/", async (req: Request<{}, {}, WarehouseBody>, res: Response) => {
+warehousesRouter.post("/", async (req: Request<{}, {}, WarehouseBody>, res: Response, next: NextFunction) => {
   try {
     const parsed = warehouseBodySchema.safeParse(req.body)
 
@@ -68,13 +66,11 @@ warehousesRouter.post("/", async (req: Request<{}, {}, WarehouseBody>, res: Resp
 
     return res.status(201).json(warehouse);
   } catch (error) {
-    return res.status(500).json({
-        message: "internal server error",
-      });
+      next(error)
   }
 });
 
-warehousesRouter.get("/:id", async (req: Request<WarehouseParams>, res: Response) => {
+warehousesRouter.get("/:id", async (req: Request<WarehouseParams>, res: Response, next: NextFunction) => {
   try {
     const { id } = req.params;
 
@@ -92,15 +88,13 @@ warehousesRouter.get("/:id", async (req: Request<WarehouseParams>, res: Response
 
     return res.status(200).json(warehouse);
   } catch (error) {
-    return res.status(500).json({
-      message: "internal server error",
-    });
+      next(error)
   } 
 });
 
 warehousesRouter.put(
   "/:id",
-  async (req: Request<WarehouseParams, {}, WarehouseBody>, res: Response) => {
+  async (req: Request<WarehouseParams, {}, WarehouseBody>, res: Response, next: NextFunction) => {
     try {
       const { id } = req.params;
       
@@ -152,14 +146,12 @@ warehousesRouter.put(
 
       return res.status(200).json(updatedWarehouse);
     } catch (error) {
-      return res.status(500).json({
-        message: "internal server error",
-      });
+        next(error)
     }
   }
 );
 
-warehousesRouter.delete("/:id", async (req: Request<WarehouseParams>, res: Response) => {
+warehousesRouter.delete("/:id", async (req: Request<WarehouseParams>, res: Response, next: NextFunction) => {
   try {
     const { id } = req.params;
 
@@ -197,41 +189,7 @@ warehousesRouter.delete("/:id", async (req: Request<WarehouseParams>, res: Respo
       message: "warehouse deleted successfully",
     });
   } catch (error) {
-    const { id } = req.params;
-
-  const existingWarehouse = await prisma.warehouse.findUnique({
-    where: {
-      id,
-    },
-  });
-
-  if (!existingWarehouse) {
-    return res.status(404).json({
-      message: "warehouse not found",
-    });
-  }
-
-  const stockMovementsCount = await prisma.stockMovement.count({
-    where: {
-      warehouseId: id,
-    },
-  });
-
-  if (stockMovementsCount > 0) {
-    return res.status(409).json({
-      message: "cannot delete warehouse with stock movements",
-    });
-  }
-
-  await prisma.warehouse.delete({
-    where: {
-      id,
-    },
-  });
-
-  return res.status(200).json({
-        message: "warehouse deleted successfully",
-    });
+      next(error)
   }
 });
 
