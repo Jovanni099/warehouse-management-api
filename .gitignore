@@ -4,3 +4,4 @@ dist
 coverage
 /src/generated/prisma
 draft.js
+zod.txt

@@ -4,149 +4,188 @@ import { prisma } from "../prisma.js";
 const productsRouter = Router();
 
 productsRouter.get("/", async (_req: Request, res: Response) => {
-  const products = await prisma.product.findMany({
-    orderBy: {
-      createdAt: "desc",
-    },
-  });
+  try {
+    const products = await prisma.product.findMany({
+      orderBy: {
+        createdAt: "desc",
+      },
+    });
 
-  res.status(200).json(products);
-});
-
-productsRouter.get("/:id", async (req: Request<{ id: string }>, res: Response) => {
-  const { id } = req.params;
-
-  const product = await prisma.product.findUnique({
-    where: {
-      id,
-    },
-  });
-
-  if (!product) {
-    return res.status(404).json({
-      message: "product not found",
+    res.status(200).json(products);
+  } catch (error) {
+    return res.status(500).json({
+      message: "internal server error",
     });
   }
-
-  return res.status(200).json(product);
 });
+
+productsRouter.get(
+  "/:id",
+  async (req: Request<{ id: string }>, res: Response) => {
+    try {
+      const { id } = req.params;
+
+      const product = await prisma.product.findUnique({
+        where: {
+          id,
+        },
+      });
+
+      if (!product) {
+        return res.status(404).json({
+          message: "product not found",
+        });
+      }
+
+      return res.status(200).json(product);
+    } catch (error) {
+      return res.status(500).json({
+        message: "internal server error",
+      });
+    }
+  }
+);
 
 productsRouter.post("/", async (req: Request, res: Response) => {
-  const { name, sku, description } = req.body;
+  try {
+    const { name, sku, description } = req.body;
 
-  if (!name || !sku) {
-    return res.status(400).json({
-      message: "name and sku are required",
+    if (!name || !sku) {
+      return res.status(400).json({
+        message: "name and sku are required",
+      });
+    }
+
+    const existingProduct = await prisma.product.findUnique({
+      where: {
+        sku,
+      },
+    });
+
+    if (existingProduct) {
+      return res.status(409).json({
+        message: "product with this sku already exists",
+      });
+    }
+
+    const product = await prisma.product.create({
+      data: {
+        name,
+        sku,
+        description,
+      },
+    });
+
+    return res.status(201).json(product);
+  } catch (error) {
+    return res.status(500).json({
+      message: "internal server error",
     });
   }
-
-  const existingProduct = await prisma.product.findUnique({
-    where: {
-      sku,
-    },
-  });
-
-  if (existingProduct) {
-    return res.status(409).json({
-      message: "product with this sku already exists",
-    });
-  }
-
-  const product = await prisma.product.create({
-    data: {
-      name,
-      sku,
-      description,
-    },
-  });
-
-  return res.status(201).json(product);
 });
 
-productsRouter.put("/:id", async (req: Request<{id:string}>, res: Response) => {
-  const { id } = req.params;
-  const { name, sku, description } = req.body;
+productsRouter.put(
+  "/:id",
+  async (req: Request<{ id: string }>, res: Response) => {
+    try {
+      const { id } = req.params;
+      const { name, sku, description } = req.body;
 
-  const existingProduct = await prisma.product.findUnique({
-    where: {
-      id,
-    },
-  });
+      const existingProduct = await prisma.product.findUnique({
+        where: {
+          id,
+        },
+      });
 
-  if (!existingProduct) {
-    return res.status(404).json({
-      message: "product not found",
-    });
+      if (!existingProduct) {
+        return res.status(404).json({
+          message: "product not found",
+        });
+      }
+
+      if (!name || !sku) {
+        return res.status(400).json({
+          message: "name and sku are required",
+        });
+      }
+
+      const productWithSameSku = await prisma.product.findUnique({
+        where: {
+          sku,
+        },
+      });
+
+      if (productWithSameSku && productWithSameSku.id !== id) {
+        return res.status(409).json({
+          message: "product with this sku already exists",
+        });
+      }
+
+      const updatedProduct = await prisma.product.update({
+        where: {
+          id,
+        },
+        data: {
+          name,
+          sku,
+          description,
+        },
+      });
+
+      return res.status(200).json(updatedProduct);
+    } catch (error) {
+      return res.status(500).json({
+        message: "internal server error",
+      });
+    }
   }
+);
 
-  if (!name || !sku) {
-    return res.status(400).json({
-      message: "name and sku are required",
-    });
+productsRouter.delete(
+  "/:id",
+  async (req: Request<{ id: string }>, res: Response) => {
+    try {
+      const { id } = req.params;
+
+      const existingProduct = await prisma.product.findUnique({
+        where: {
+          id,
+        },
+      });
+
+      if (!existingProduct) {
+        return res.status(404).json({
+          message: "product not found",
+        });
+      }
+
+      const stockMovementsCount = await prisma.stockMovement.count({
+        where: {
+          productId: id,
+        },
+      });
+
+      if (stockMovementsCount > 0) {
+        return res.status(409).json({
+          message: "cannot delete product with stock movements",
+        });
+      }
+
+      await prisma.product.delete({
+        where: {
+          id,
+        },
+      });
+
+      return res.status(200).json({
+        message: "product deleted successfully",
+      });
+    } catch (error) {
+      return res.status(500).json({
+        message: "internal server error",
+      });
+    }
   }
-
-  const productWithSameSku = await prisma.product.findUnique({
-    where: {
-      sku,
-    },
-  });
-
-  if (productWithSameSku && productWithSameSku.id !== id) {
-    return res.status(409).json({
-      message: "product with this sku already exists",
-    });
-  }
-
-  const updatedProduct = await prisma.product.update({
-    where: {
-      id,
-    },
-    data: {
-      name,
-      sku,
-      description,
-    },
-  });
-
-  return res.status(200).json(updatedProduct);
-});
-
-productsRouter.delete("/:id", async (req: Request<{id: string}>, res: Response) => {
-  const { id } = req.params;
-
-  const existingProduct = await prisma.product.findUnique({
-    where: {
-      id,
-    },
-  });
-
-  if (!existingProduct) {
-    return res.status(404).json({
-      message: "product not found",
-    });
-  }
-
-  const stockMovementsCount = await prisma.stockMovement.count({
-    where: {
-      productId: id,
-    },
-  });
-
-  if (stockMovementsCount > 0) {
-    return res.status(409).json({
-      message: "cannot delete product with stock movements",
-    });
-  }
-
-  await prisma.product.delete({
-    where: {
-      id,
-    },
-  });
-
-  return res.status(200).json({
-    message: "product deleted successfully",
-  });
-});
+);
 
 export default productsRouter;
