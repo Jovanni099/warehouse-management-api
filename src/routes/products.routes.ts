@@ -1,4 +1,4 @@
-import { Router, Request, Response } from "express";
+import { Router, Request, Response, NextFunction } from "express";
 import { z } from "zod";
 import { prisma } from "../prisma.js";
 
@@ -16,25 +16,26 @@ const productBodySchema = z.object({
 
 type ProductBody = z.infer<typeof productBodySchema>;
 
-productsRouter.get("/", async (_req: Request, res: Response) => {
-  try {
-    const products = await prisma.product.findMany({
-      orderBy: {
-        createdAt: "desc",
-      },
-    });
+productsRouter.get(
+  "/",
+  async (_req: Request, res: Response, next: NextFunction) => {
+    try {
+      const products = await prisma.product.findMany({
+        orderBy: {
+          createdAt: "desc",
+        },
+      });
 
-    res.status(200).json(products);
-  } catch (error) {
-    return res.status(500).json({
-      message: "internal server error",
-    });
+      return res.status(200).json(products);
+    } catch (error) {
+      next(error);
+    }
   }
-});
+);
 
 productsRouter.get(
   "/:id",
-  async (req: Request<ProductParams>, res: Response) => {
+  async (req: Request<ProductParams>, res: Response, next: NextFunction) => {
     try {
       const { id } = req.params;
 
@@ -52,57 +53,64 @@ productsRouter.get(
 
       return res.status(200).json(product);
     } catch (error) {
-      return res.status(500).json({
-        message: "internal server error",
-      });
+      next(error);
     }
   }
 );
 
-productsRouter.post("/", async (req: Request, res: Response) => {
-  try {
-    const parsed = productBodySchema.safeParse(req.body);
+productsRouter.post(
+  "/",
+  async (
+    req: Request<{}, {}, ProductBody>,
+    res: Response,
+    next: NextFunction
+  ) => {
+    try {
+      const parsed = productBodySchema.safeParse(req.body);
 
-    if (!parsed.success) {
-      return res.status(400).json({
-        message: "validation error",
-        errors: parsed.error.issues,
+      if (!parsed.success) {
+        return res.status(400).json({
+          message: "validation error",
+          errors: parsed.error.issues,
+        });
+      }
+
+      const { name, sku, description } = parsed.data;
+
+      const existingProduct = await prisma.product.findUnique({
+        where: {
+          sku,
+        },
       });
-    }
 
-    const { name, sku, description } = parsed.data;
+      if (existingProduct) {
+        return res.status(409).json({
+          message: "product with this sku already exists",
+        });
+      }
 
-    const existingProduct = await prisma.product.findUnique({
-      where: {
-        sku,
-      },
-    });
-
-    if (existingProduct) {
-      return res.status(409).json({
-        message: "product with this sku already exists",
+      const product = await prisma.product.create({
+        data: {
+          name,
+          sku,
+          description,
+        },
       });
+
+      return res.status(201).json(product);
+    } catch (error) {
+      next(error);
     }
-
-    const product = await prisma.product.create({
-      data: {
-        name,
-        sku,
-        description,
-      },
-    });
-
-    return res.status(201).json(product);
-  } catch (error) {
-    return res.status(500).json({
-      message: "internal server error",
-    });
   }
-});
+);
 
 productsRouter.put(
   "/:id",
-  async (req: Request<ProductParams, {}, ProductBody>, res: Response) => {
+  async (
+    req: Request<ProductParams, {}, ProductBody>,
+    res: Response,
+    next: NextFunction
+  ) => {
     try {
       const { id } = req.params;
 
@@ -154,16 +162,14 @@ productsRouter.put(
 
       return res.status(200).json(updatedProduct);
     } catch (error) {
-      return res.status(500).json({
-        message: "internal server error",
-      });
+      next(error);
     }
   }
 );
 
 productsRouter.delete(
   "/:id",
-  async (req: Request<ProductParams>, res: Response) => {
+  async (req: Request<ProductParams>, res: Response, next: NextFunction) => {
     try {
       const { id } = req.params;
 
@@ -201,9 +207,7 @@ productsRouter.delete(
         message: "product deleted successfully",
       });
     } catch (error) {
-      return res.status(500).json({
-        message: "internal server error",
-      });
+      next(error);
     }
   }
 );
