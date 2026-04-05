@@ -1,7 +1,20 @@
 import { Router, Request, Response } from "express";
+import { z } from "zod";
 import { prisma } from "../prisma.js";
 
 const productsRouter = Router();
+
+type ProductParams = {
+  id: string;
+};
+
+const productBodySchema = z.object({
+  name: z.string().trim().min(1, "name is required"),
+  sku: z.string().trim().min(1, "sku is required"),
+  description: z.string().trim().optional(),
+});
+
+type ProductBody = z.infer<typeof productBodySchema>;
 
 productsRouter.get("/", async (_req: Request, res: Response) => {
   try {
@@ -21,7 +34,7 @@ productsRouter.get("/", async (_req: Request, res: Response) => {
 
 productsRouter.get(
   "/:id",
-  async (req: Request<{ id: string }>, res: Response) => {
+  async (req: Request<ProductParams>, res: Response) => {
     try {
       const { id } = req.params;
 
@@ -48,13 +61,16 @@ productsRouter.get(
 
 productsRouter.post("/", async (req: Request, res: Response) => {
   try {
-    const { name, sku, description } = req.body;
+    const parsed = productBodySchema.safeParse(req.body);
 
-    if (!name || !sku) {
+    if (!parsed.success) {
       return res.status(400).json({
-        message: "name and sku are required",
+        message: "validation error",
+        errors: parsed.error.issues,
       });
     }
+
+    const { name, sku, description } = parsed.data;
 
     const existingProduct = await prisma.product.findUnique({
       where: {
@@ -86,10 +102,20 @@ productsRouter.post("/", async (req: Request, res: Response) => {
 
 productsRouter.put(
   "/:id",
-  async (req: Request<{ id: string }>, res: Response) => {
+  async (req: Request<ProductParams, {}, ProductBody>, res: Response) => {
     try {
       const { id } = req.params;
-      const { name, sku, description } = req.body;
+
+      const parsed = productBodySchema.safeParse(req.body);
+
+      if (!parsed.success) {
+        return res.status(400).json({
+          message: "validation error",
+          errors: parsed.error.issues,
+        });
+      }
+
+      const { name, sku, description } = parsed.data;
 
       const existingProduct = await prisma.product.findUnique({
         where: {
@@ -100,12 +126,6 @@ productsRouter.put(
       if (!existingProduct) {
         return res.status(404).json({
           message: "product not found",
-        });
-      }
-
-      if (!name || !sku) {
-        return res.status(400).json({
-          message: "name and sku are required",
         });
       }
 
@@ -143,7 +163,7 @@ productsRouter.put(
 
 productsRouter.delete(
   "/:id",
-  async (req: Request<{ id: string }>, res: Response) => {
+  async (req: Request<ProductParams>, res: Response) => {
     try {
       const { id } = req.params;
 
