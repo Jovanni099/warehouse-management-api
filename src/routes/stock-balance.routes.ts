@@ -1,17 +1,39 @@
 import { Router, Request, Response, NextFunction } from "express";
+import { z } from "zod";
 import { prisma } from "../prisma.js";
 
 const stockBalanceRouter = Router();
 
+const stockBalanceParamsSchema = z.object({
+  productId: z.string().trim().min(1, "productId is required"),
+  warehouseId: z.string().trim().min(1, "warehouseId is required"),
+});
+
+const warehouseBalanceParamsSchema = z.object({
+  warehouseId: z.string().trim().min(1, "warehouseId is required"),
+});
+
+type StockBalanceParams = z.infer<typeof stockBalanceParamsSchema>;
+type WarehouseBalanceParams = z.infer<typeof warehouseBalanceParamsSchema>;
+
 stockBalanceRouter.get(
   "/:productId/:warehouseId",
   async (
-    req: Request<{ productId: string; warehouseId: string }>,
+    req: Request<StockBalanceParams>,
     res: Response,
     next: NextFunction
   ) => {
     try {
-      const { productId, warehouseId } = req.params;
+      const parsed = stockBalanceParamsSchema.safeParse(req.params);
+
+      if (!parsed.success) {
+        return res.status(400).json({
+          message: "validation error",
+          errors: parsed.error.issues,
+        });
+      }
+
+      const { productId, warehouseId } = parsed.data;
 
       const product = await prisma.product.findUnique({
         where: { id: productId },
@@ -76,12 +98,21 @@ stockBalanceRouter.get(
 stockBalanceRouter.get(
   "/warehouse/:warehouseId",
   async (
-    req: Request<{ warehouseId: string }>,
+    req: Request<WarehouseBalanceParams>,
     res: Response,
     next: NextFunction
   ) => {
     try {
-      const { warehouseId } = req.params;
+      const parsed = warehouseBalanceParamsSchema.safeParse(req.params);
+
+      if (!parsed.success) {
+        return res.status(400).json({
+          message: "validation error",
+          errors: parsed.error.issues,
+        });
+      }
+
+      const { warehouseId } = parsed.data;
 
       const warehouse = await prisma.warehouse.findUnique({
         where: { id: warehouseId },
