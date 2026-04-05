@@ -1,7 +1,18 @@
 import { Router, Request, Response, NextFunction } from "express";
+import { z } from "zod";
 import { prisma } from "../prisma.js";
 
 const stockMovementsRouter = Router();
+
+const stockMovementBodySchema = z.object({
+  productId: z.string().trim().min(1, "productId is required"),
+  warehouseId: z.string().trim().min(1, "warehouseId is required"),
+  type: z.enum(["IN", "OUT"]),
+  quantity: z.number().int().positive("quantity must be a positive integer"),
+  note: z.string().trim().optional(),
+});
+
+type StockMovementBody = z.infer<typeof stockMovementBodySchema>;
 
 stockMovementsRouter.get(
   "/",
@@ -26,10 +37,22 @@ stockMovementsRouter.get(
 
 stockMovementsRouter.post(
   "/",
-  async (req: Request, res: Response, next: NextFunction) => {
+  async (
+    req: Request<{}, {}, StockMovementBody>,
+    res: Response,
+    next: NextFunction
+  ) => {
     try {
-      const { productId, warehouseId, type, quantity, note } = req.body;
+      const parsed = stockMovementBodySchema.safeParse(req.body);
 
+      if (!parsed.success) {
+        return res.status(400).json({
+          message: "validation error",
+          errors: parsed.error.issues,
+        });
+      }
+
+      const { productId, warehouseId, type, quantity, note } = parsed.data;
       if (!productId || !warehouseId || !type || quantity === undefined) {
         return res.status(400).json({
           message: "productId, warehouseId, type and quantity are required",
